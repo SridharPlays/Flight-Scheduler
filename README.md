@@ -32,7 +32,7 @@ To prevent **starvation** (where low-priority processes are never served), an ag
 
 ## 🚀 Implementations
 
-### **1. Live Web Application (`atc_scheduler.html`)**
+### **1. Live Web Application (`index.html`)**
 
 An interactive web-based simulation that visualizes the ATC scheduler in real-time.
 
@@ -45,7 +45,7 @@ An interactive web-based simulation that visualizes the ATC scheduler in real-ti
 
 **How to Run:**
 
-  - Simply open the `atc_scheduler.html` file in any modern web browser (like Chrome, Firefox, or Edge). No additional setup is required.
+  - Simply open the `index.html` file in any modern web browser (like Chrome, Firefox, or Edge). No additional setup is required.
 
 ### **2. C++ Console Simulation (`atc_scheduler.cpp`)**
 
