@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live ATC Scheduler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .log-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-panel::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        .log-panel::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        .log-panel::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Left Panel: Controls and Runway Status -->
+        <div class="lg:col-span-1 flex flex-col gap-8">
+            <!-- Title -->
+            <div>
+                <h1 class="text-3xl font-bold text-white">ATC Priority Scheduler</h1>
+                <p class="text-gray-400 mt-1">Live Simulation</p>
+            </div>
+
+            <!-- Runway Status -->
+            <div id="runway-status-card" class="bg-gray-800 p-6 rounded-lg shadow-lg transition-all duration-300">
+                <h2 class="text-xl font-semibold text-white mb-4">Runway Status</h2>
+                <div id="runway-status" class="text-2xl font-bold p-4 rounded-md text-center bg-green-500/20 text-green-400 border border-green-500">
+                    FREE
+                </div>
+                <div id="runway-details" class="mt-4 text-gray-400 text-center h-12">
+                    <!-- Flight details will be injected here -->
+                </div>
+            </div>
+
+            <!-- Add Flight Form -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold text-white mb-4">Add New Flight</h2>
+                <form id="add-flight-form" class="space-y-4">
+                    <div>
+                        <label for="flight-id" class="block text-sm font-medium text-gray-300">Flight ID</label>
+                        <input type="text" id="flight-id" name="flight-id" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white p-2" placeholder="e.g., BA2490" required>
+                    </div>
+                    <div>
+                        <label for="flight-type" class="block text-sm font-medium text-gray-300">Flight Type</label>
+                        <select id="flight-type" name="flight-type" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white p-2">
+                            <option value="DOMESTIC">Domestic</option>
+                            <option value="INTERNATIONAL">International</option>
+                            <option value="CARGO">Cargo</option>
+                            <option value="VIP">VIP</option>
+                            <option value="LOW_FUEL">Low Fuel</option>
+                            <option value="EMERGENCY">Emergency</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="burst-time" class="block text-sm font-medium text-gray-300">Runway Time (Cycles)</label>
+                        <input type="number" id="burst-time" name="burst-time" min="2" max="10" value="4" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white p-2" required>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                        Add to Queue
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Panel: Queue and Logs -->
+        <div class="lg:col-span-2 flex flex-col gap-8">
+            <!-- Waiting Queue Table -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg flex-grow flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-white">Waiting Queue</h2>
+                    <div class="text-lg font-mono bg-gray-900 px-3 py-1 rounded-md">
+                        CYCLE: <span id="simulation-cycle">0</span>
+                    </div>
+                </div>
+                <div class="overflow-auto flex-grow">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700/50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Flight ID</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Wait Time</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-body" class="bg-gray-800 divide-y divide-gray-700">
+                            <!-- Rows will be injected here -->
+                        </tbody>
+                    </table>
+                     <div id="empty-queue-message" class="text-center py-8 text-gray-500">Queue is empty.</div>
+                </div>
+            </div>
+
+            <!-- Simulation Log -->
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg h-64 flex flex-col">
+                 <h2 class="text-xl font-semibold text-white mb-4">Simulation Log</h2>
+                 <div id="log-panel" class="log-panel flex-grow overflow-y-auto bg-gray-900 rounded-md p-4 space-y-2 text-sm font-mono">
+                     <!-- Log messages will be injected here -->
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data Structures
+        const FlightType = {
+            EMERGENCY: 'EMERGENCY',
+            LOW_FUEL: 'LOW_FUEL',
+            VIP: 'VIP',
+            INTERNATIONAL: 'INTERNATIONAL',
+            DOMESTIC: 'DOMESTIC',
+            CARGO: 'CARGO'
+        };
+
+        const flightTypeDisplayMap = {
+            [FlightType.EMERGENCY]: 'Emergency',
+            [FlightType.LOW_FUEL]: 'Low Fuel',
+            [FlightType.VIP]: 'VIP',
+            [FlightType.INTERNATIONAL]: 'International',
+            [FlightType.DOMESTIC]: 'Domestic',
+            [FlightType.CARGO]: 'Cargo'
+        };
+
+        class Flight {
+            constructor(id, type, arrivalTime, burstTime) {
+                this.id = id;
+                this.type = type;
+                this.arrivalTime = arrivalTime;
+                this.burstTime = burstTime;
+                this.waitingTime = 0;
+                this.priority = 0;
+            }
+        }
+
+        // Scheduler Logic
+        class ATCScheduler {
+            constructor() {
+                this.waitingQueue = [];
+                this.isRunwayBusy = false;
+                this.currentFlightOnRunway = null;
+                this.runwayTimeLeft = 0;
+                this.simulationCycle = 0;
+            }
+
+            calculatePriority(flight) {
+                let basePriority = 0;
+                switch (flight.type) {
+                    case FlightType.EMERGENCY:     basePriority = 600; break;
+                    case FlightType.LOW_FUEL:      basePriority = 500; break;
+                    case FlightType.VIP:           basePriority = 400; break;
+                    case FlightType.INTERNATIONAL: basePriority = 300; break;
+                    case FlightType.DOMESTIC:      basePriority = 200; break;
+                    case FlightType.CARGO:         basePriority = 100; break;
+                }
+
+                // Aging mechanism: priority increases with waiting time.
+                flight.priority = basePriority + (flight.waitingTime * 10);
+            }
+
+            addFlight(flight) {
+                this.waitingQueue.push(flight);
+                logMessage(`INFO: Flight ${flight.id} (${flightTypeDisplayMap[flight.type]}) entered the system.`, 'blue');
+            }
+
+            runCycle() {
+                this.simulationCycle++;
+
+                // 1. Update runway status
+                if (this.isRunwayBusy) {
+                    this.runwayTimeLeft--;
+                    if (this.runwayTimeLeft <= 0) {
+                        logMessage(`SUCCESS: Flight ${this.currentFlightOnRunway.id} has cleared the runway.`, 'green');
+                        this.isRunwayBusy = false;
+                        this.currentFlightOnRunway = null;
+                    }
+                }
+
+                // 2. Update waiting flights (Aging)
+                this.waitingQueue.forEach(flight => {
+                    flight.waitingTime++;
+                    this.calculatePriority(flight);
+                });
+
+                // 3. Schedule new flight if runway is free
+                if (!this.isRunwayBusy && this.waitingQueue.length > 0) {
+                    // Sort to find highest priority flight
+                    this.waitingQueue.sort((a, b) => b.priority - a.priority);
+                    
+                    this.currentFlightOnRunway = this.waitingQueue.shift(); // Remove from queue
+                    this.isRunwayBusy = true;
+                    this.runwayTimeLeft = this.currentFlightOnRunway.burstTime;
+
+                    logMessage(`ACTION: Scheduling Flight ${this.currentFlightOnRunway.id}. Waited for ${this.currentFlightOnRunway.waitingTime} cycles.`, 'yellow');
+                }
+                
+                // 4. Update the UI
+                render();
+            }
+        }
+
+        // DOM Elements
+        const runwayStatusEl = document.getElementById('runway-status');
+        const runwayDetailsEl = document.getElementById('runway-details');
+        const runwayStatusCard = document.getElementById('runway-status-card');
+        const queueBodyEl = document.getElementById('queue-body');
+        const emptyQueueMessageEl = document.getElementById('empty-queue-message');
+        const simulationCycleEl = document.getElementById('simulation-cycle');
+        const logPanelEl = document.getElementById('log-panel');
+        const addFlightForm = document.getElementById('add-flight-form');
+
+        // UI Rendering Functions
+        function renderRunwayStatus() {
+            if (scheduler.isRunwayBusy) {
+                runwayStatusEl.textContent = 'BUSY';
+                runwayStatusEl.className = 'text-2xl font-bold p-4 rounded-md text-center bg-red-500/20 text-red-400 border border-red-500';
+
+                const flight = scheduler.currentFlightOnRunway;
+                runwayDetailsEl.innerHTML = `
+                    <p><strong>Flight:</strong> ${flight.id} (${flightTypeDisplayMap[flight.type]})</p>
+                    <p><strong>Time Left:</strong> ${scheduler.runwayTimeLeft} cycles</p>
+                `;
+            } else {
+                runwayStatusEl.textContent = 'FREE';
+                runwayStatusEl.className = 'text-2xl font-bold p-4 rounded-md text-center bg-green-500/20 text-green-400 border border-green-500';
+                runwayDetailsEl.innerHTML = '<p>Ready for next operation.</p>';
+            }
+        }
+
+        function renderWaitingQueue() {
+            queueBodyEl.innerHTML = ''; // Clear existing rows
+
+            if (scheduler.waitingQueue.length === 0) {
+                emptyQueueMessageEl.style.display = 'block';
+                return;
+            }
+            
+            emptyQueueMessageEl.style.display = 'none';
+
+            // Create a sorted copy for display without modifying the original order in this step
+            const sortedQueue = [...scheduler.waitingQueue].sort((a, b) => b.priority - a.priority);
+            
+            sortedQueue.forEach(flight => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-700/50";
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">${flight.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${flightTypeDisplayMap[flight.type]}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${flight.waitingTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${getPriorityColor(flight.priority)}">${flight.priority}</td>
+                `;
+                queueBodyEl.appendChild(row);
+            });
+        }
+        
+        function getPriorityColor(priority) {
+            if (priority >= 600) return 'text-red-400';
+            if (priority >= 500) return 'text-orange-400';
+            if (priority >= 300) return 'text-yellow-400';
+            return 'text-blue-400';
+        }
+
+        function logMessage(message, type = 'gray') {
+            const colorClasses = {
+                gray: 'text-gray-400',
+                blue: 'text-blue-400',
+                green: 'text-green-400',
+                yellow: 'text-yellow-400',
+                red: 'text-red-400'
+            };
+
+            const logEntry = document.createElement('p');
+            const timestamp = `[CYCLE ${scheduler.simulationCycle.toString().padStart(3, '0')}]`;
+            logEntry.innerHTML = `<span class="text-gray-500">${timestamp}</span> <span class="${colorClasses[type]}">${message}</span>`;
+            
+            logPanelEl.prepend(logEntry);
+        }
+        
+        function renderCycleCounter() {
+            simulationCycleEl.textContent = scheduler.simulationCycle;
+        }
+
+        // Global Rendering
+        function render() {
+            renderRunwayStatus();
+            renderWaitingQueue();
+            renderCycleCounter();
+        }
+
+        const scheduler = new ATCScheduler();
+
+        // Handle form submission
+        addFlightForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = e.target['flight-id'].value.toUpperCase();
+            const type = e.target['flight-type'].value;
+            const burstTime = parseInt(e.target['burst-time'].value, 10);
+            
+            if (id && type && burstTime) {
+                const newFlight = new Flight(id, type, scheduler.simulationCycle, burstTime);
+                scheduler.addFlight(newFlight);
+                renderWaitingQueue(); // Update queue immediately
+                e.target.reset();
+                // set focus back to flight id
+                document.getElementById('flight-id').focus();
+            }
+        });
+
+        // Initialize with some flights
+        function initializeSimulation() {
+            scheduler.addFlight(new Flight("DL456", FlightType.DOMESTIC, 0, 4));
+            scheduler.addFlight(new Flight("BA288", FlightType.INTERNATIONAL, 0, 6));
+            scheduler.addFlight(new Flight("FX123", FlightType.CARGO, 1, 5));
+            scheduler.addFlight(new Flight("AA789", FlightType.DOMESTIC, 1, 4));
+            logMessage("Simulation initialized. Starting cycles...", "gray");
+            render();
+        }
+
+        // Start Simulation
+        window.onload = () => {
+            initializeSimulation();
+            setInterval(() => scheduler.runCycle(), 2000); // Run a cycle every 2 seconds
+        };
+
+    </script>
+</body>
+</html>
